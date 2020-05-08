@@ -27,6 +27,27 @@ void token::issue(const name &to, const asset &quantity, const string &memo)
    check(sym.is_valid(), "invalid symbol name");
    check(memo.size() <= 256, "memo has more than 256 bytes");
 
+   // issue once every six months
+   limits _limits(get_self(), get_self().value);
+   auto itr = _limits.find(sym.code().raw());
+   if (itr != _limits.end())
+   {
+      auto sec_since_last_issue = current_time_point().sec_since_epoch() - itr->last_issue.sec_since_epoch();
+      print("sec_since_last_issue:", sec_since_last_issue);
+      uint64_t DAY_180 = 86400 * 180;
+      check(sec_since_last_issue > DAY_180, "can only issue once every six months");
+      _limits.modify(itr, same_payer, [&](auto &s) {
+         s.last_issue = current_time_point();
+      });
+   }
+   else
+   {
+      _limits.emplace(get_self(), [&](auto &a) {
+         a.sym = sym.code();
+         a.last_issue = current_time_point();
+      });
+   }
+
    stats statstable(get_self(), sym.code().raw());
    auto existing = statstable.find(sym.code().raw());
    check(existing != statstable.end(), "token with symbol does not exist, create token before issue");
@@ -39,6 +60,9 @@ void token::issue(const name &to, const asset &quantity, const string &memo)
 
    check(quantity.symbol == st.supply.symbol, "symbol precision mismatch");
    check(quantity.amount <= st.max_supply.amount - st.supply.amount, "quantity exceeds available supply");
+
+   // issue 10% of max_supply once every time
+   check(quantity.amount <= st.max_supply.amount / 10, "can only issue 10% of max_supply once every time");
 
    statstable.modify(st, same_payer, [&](auto &s) {
       s.supply += quantity;

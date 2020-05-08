@@ -2,6 +2,7 @@
 
 #include <eosio/asset.hpp>
 #include <eosio/eosio.hpp>
+#include <eosio/system.hpp>
 
 #include <string>
 
@@ -151,8 +152,17 @@ private:
       uint64_t primary_key() const { return supply.symbol.code().raw(); }
    };
 
+   struct [[eosio::table]] limit
+   {
+      symbol_code sym;
+      time_point_sec last_issue;
+
+      uint64_t primary_key() const { return sym.raw(); }
+   };
+
    typedef eosio::multi_index<"accounts"_n, account> accounts;
    typedef eosio::multi_index<"stat"_n, currency_stats> stats;
+   typedef eosio::multi_index<"limit"_n, limit> limits;
 
    void sub_balance(const name &owner, const asset &value);
    void add_balance(const name &owner, const asset &value, const name &ram_payer);
